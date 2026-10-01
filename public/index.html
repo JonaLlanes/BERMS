@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Biomedical Equipment Records</title>
+  <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <p class="eyebrow">Biomedical Engineering</p>
+      <h1>Equipment records</h1>
+    </div>
+  </header>
+
+  <main class="page">
+    <section class="metrics" id="metrics" aria-label="Inventory summary">
+      <p class="metric-caption">Devices</p>
+      <div class="metric-row">
+      <button class="metric active" type="button" data-metric="total" aria-pressed="true">
+        <span class="metric-value" id="metric-total">—</span>
+        <span class="metric-label">Total</span>
+      </button>
+      <button class="metric" type="button" data-metric="in_service" aria-pressed="false">
+        <span class="metric-value" id="metric-in-service">—</span>
+        <span class="metric-label">In service</span>
+      </button>
+      <button class="metric" type="button" data-metric="in_repair" aria-pressed="false">
+        <span class="metric-value" id="metric-under-maintenance">—</span>
+        <span class="metric-label">In repair</span>
+      </button>
+      <button class="metric" type="button" data-metric="out_of_service" aria-pressed="false">
+        <span class="metric-value" id="metric-out-of-service">—</span>
+        <span class="metric-label">Out of service</span>
+      </button>
+      <button class="metric" type="button" data-metric="decommissioned" aria-pressed="false">
+        <span class="metric-value" id="metric-decommissioned">—</span>
+        <span class="metric-label">Decommissioned</span>
+      </button>
+      </div>
+      <p class="metric-caption">Preventive maintenance</p>
+      <div class="metric-row metric-row-pm">
+      <button class="metric metric-warn" type="button" data-metric="due_soon" aria-pressed="false">
+        <span class="metric-value" id="metric-due-soon">—</span>
+        <span class="metric-label">Due</span>
+      </button>
+      <button class="metric metric-danger" type="button" data-metric="overdue" aria-pressed="false">
+        <span class="metric-value" id="metric-overdue">—</span>
+        <span class="metric-label">Overdue</span>
+      </button>
+      </div>
+    </section>
+
+    <section class="toolbar" aria-label="Equipment actions">
+      <form id="search-form" class="filters" role="search">
+        <div>
+          <label for="search">Search</label>
+          <input id="search" name="q" type="search" placeholder="Device, asset tag, serial number, clinical department" autocomplete="off">
+        </div>
+        <div>
+          <label for="maintenance-filter">PM status</label>
+          <select id="maintenance-filter">
+            <option value="">All PM statuses</option>
+            <option>Not Scheduled</option>
+            <option>Current</option>
+            <option>Due</option>
+            <option>Overdue</option>
+          </select>
+        </div>
+        <div>
+          <label for="service-filter">Operational status</label>
+          <select id="service-filter">
+            <option value="">All operational statuses</option>
+            <option>In Service</option>
+            <option>In Repair</option>
+            <option>Out of Service</option>
+            <option>Decommissioned</option>
+          </select>
+        </div>
+        <div>
+          <label for="category-filter">Device category</label>
+          <select id="category-filter">
+            <option value="">All device categories</option>
+            <option>Patient Monitor</option>
+            <option>Infusion Pump</option>
+            <option>Ventilator</option>
+            <option>Defibrillator</option>
+            <option>Diagnostic Imaging</option>
+            <option>Laboratory Analyzer</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="schedule-filter">PM schedule</label>
+          <select id="schedule-filter">
+            <option value="">All PM schedules</option>
+            <option>Monthly</option>
+            <option>Quarterly</option>
+            <option>Semi-Annual</option>
+            <option>Annual</option>
+          </select>
+        </div>
+        <div>
+          <label for="department-filter">Clinical department</label>
+          <select id="department-filter">
+            <option value="">All departments</option>
+          </select>
+        </div>
+      </form>
+      <div class="toolbar-actions">
+        <button id="reset-filters" class="button reset" type="button">Reset filters</button>
+        <button id="add-button" class="button primary" type="button">Add device</button>
+      </div>
+    </section>
+
+    <p id="result-count" class="summary" aria-live="polite"></p>
+    <p id="banner" class="banner" role="status" hidden></p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Device</th>
+            <th scope="col">Clinical department</th>
+            <th scope="col">Last PM</th>
+            <th scope="col">Next PM due</th>
+            <th scope="col">PM status</th>
+            <th scope="col">Operational status</th>
+            <th scope="col"><span class="sr-only">Actions</span></th>
+          </tr>
+        </thead>
+        <tbody id="equipment-body">
+          <tr>
+            <td colspan="7" class="empty">Loading device records…</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <dialog id="form-dialog" aria-labelledby="form-title">
+    <form id="equipment-form" novalidate>
+      <div class="dialog-heading">
+        <h2 id="form-title">Add device</h2>
+        <button class="icon-button" type="button" data-close="form" aria-label="Close">×</button>
+      </div>
+      <p id="form-error" class="form-error" hidden></p>
+      <div class="fields">
+        <div class="field">
+          <label for="equipment_name">Device name</label>
+          <input id="equipment_name" name="equipment_name" maxlength="100" required>
+          <p class="field-error" id="equipment_name-error"></p>
+        </div>
+        <div class="field">
+          <label for="asset_tag">Asset tag</label>
+          <input id="asset_tag" name="asset_tag" maxlength="50" required>
+          <p class="field-error" id="asset_tag-error"></p>
+        </div>
+        <div class="field">
+          <label for="category">Device category</label>
+          <select id="category" name="category" required>
+            <option value="">Select a device category</option>
+            <option>Patient Monitor</option>
+            <option>Infusion Pump</option>
+            <option>Ventilator</option>
+            <option>Defibrillator</option>
+            <option>Diagnostic Imaging</option>
+            <option>Laboratory Analyzer</option>
+            <option>Other</option>
+          </select>
+          <p class="field-error" id="category-error"></p>
+        </div>
+        <div class="field">
+          <label for="department">Clinical department</label>
+          <input id="department" name="department" maxlength="100" placeholder="ICU" required>
+          <p class="field-error" id="department-error"></p>
+        </div>
+        <div class="field">
+          <label for="manufacturer">Manufacturer</label>
+          <input id="manufacturer" name="manufacturer" maxlength="100" required>
+          <p class="field-error" id="manufacturer-error"></p>
+        </div>
+        <div class="field">
+          <label for="model_number">Model number</label>
+          <input id="model_number" name="model_number" maxlength="100" required>
+          <p class="field-error" id="model_number-error"></p>
+        </div>
+        <div class="field">
+          <label for="serial_number">Serial number</label>
+          <input id="serial_number" name="serial_number" maxlength="100" required>
+          <p class="field-error" id="serial_number-error"></p>
+        </div>
+        <div class="field">
+          <label for="operational_status">Operational status</label>
+          <select id="operational_status" name="operational_status">
+            <option>In Service</option>
+            <option>In Repair</option>
+            <option>Out of Service</option>
+            <option>Decommissioned</option>
+          </select>
+          <p class="field-error" id="operational_status-error"></p>
+        </div>
+        <div class="field">
+          <label for="pm_interval">PM schedule</label>
+          <select id="pm_interval" name="pm_interval">
+            <option value="">No set schedule</option>
+            <option>Monthly</option>
+            <option>Quarterly</option>
+            <option>Semi-Annual</option>
+            <option>Annual</option>
+          </select>
+          <p class="field-hint">Next PM due is filled from the last PM date when a schedule is selected.</p>
+          <p class="field-error" id="pm_interval-error"></p>
+        </div>
+        <div class="field">
+          <label for="purchase_date">Purchase date</label>
+          <input id="purchase_date" name="purchase_date" type="date">
+          <p class="field-error" id="purchase_date-error"></p>
+        </div>
+        <div class="field">
+          <label for="last_maintenance_date">Last PM date</label>
+          <input id="last_maintenance_date" name="last_maintenance_date" type="date">
+          <p class="field-error" id="last_maintenance_date-error"></p>
+        </div>
+        <div class="field">
+          <label for="next_maintenance_date">Next PM due date</label>
+          <input id="next_maintenance_date" name="next_maintenance_date" type="date">
+          <p class="field-error" id="next_maintenance_date-error"></p>
+        </div>
+        <div class="field field-wide">
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes" maxlength="2000" rows="3"></textarea>
+          <p class="field-error" id="notes-error"></p>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="button ghost" type="button" data-close="form">Cancel</button>
+        <button class="button primary" type="submit">Save device</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="history-dialog" aria-labelledby="history-title">
+    <div class="dialog-heading">
+      <h2 id="history-title">Service history</h2>
+      <button class="icon-button" type="button" data-close="history" aria-label="Close">×</button>
+    </div>
+    <p id="history-meta" class="history-meta"></p>
+    <dl id="device-facts" class="facts"></dl>
+    <h3 class="section-label">Service history</h3>
+    <p id="history-message" class="form-note" hidden></p>
+    <div id="history-list" class="history-list"></div>
+    <form id="history-form" novalidate>
+      <h3>Record service</h3>
+      <div class="fields">
+        <div class="field">
+          <label for="maintenance_type">Work type</label>
+          <select id="maintenance_type" name="maintenance_type" required>
+            <option value="">Select a work type</option>
+            <option>Preventive Maintenance</option>
+            <option>Corrective Maintenance</option>
+            <option>Incoming Inspection</option>
+            <option>Electrical Safety Test</option>
+            <option>Calibration</option>
+          </select>
+          <p class="field-error" id="maintenance_type-error"></p>
+        </div>
+        <div class="field">
+          <label for="performed_by">Performed by</label>
+          <input id="performed_by" name="performed_by" maxlength="100" required>
+          <p class="field-error" id="performed_by-error"></p>
+        </div>
+        <div class="field">
+          <label for="performed_by_type">Engineer</label>
+          <select id="performed_by_type" name="performed_by_type" required>
+            <option value="">Select engineer type</option>
+            <option>In-House Engineer</option>
+            <option>Supplier Engineer</option>
+          </select>
+          <p class="field-error" id="performed_by_type-error"></p>
+        </div>
+        <div class="field">
+          <label for="maintenance_date">Service date</label>
+          <input id="maintenance_date" name="maintenance_date" type="date" required>
+          <p class="field-error" id="maintenance_date-error"></p>
+        </div>
+        <div class="field">
+          <label for="history_operational_status">Operational status after check</label>
+          <select id="history_operational_status" name="operational_status" required>
+            <option>In Service</option>
+            <option>In Repair</option>
+            <option>Out of Service</option>
+            <option>Decommissioned</option>
+          </select>
+          <p class="field-hint">Findings are required if the device is not left In Service.</p>
+          <p class="field-error" id="history_operational_status-error"></p>
+        </div>
+        <div class="field">
+          <label for="history_next_maintenance_date">Next PM due date</label>
+          <input id="history_next_maintenance_date" name="next_maintenance_date" type="date">
+          <p class="field-error" id="history_next_maintenance_date-error"></p>
+        </div>
+        <div class="field field-wide">
+          <label for="remarks">Findings</label>
+          <textarea id="remarks" name="remarks" maxlength="1000" rows="3"></textarea>
+          <p class="field-error" id="remarks-error"></p>
+        </div>
+      </div>
+      <div class="dialog-actions">
+      <button type="button" class="button ghost" id="details-edit">Edit device</button>
+      <button class="button ghost" type="button" data-close="history">Close</button>
+        <button class="button primary" type="submit">Save service</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
