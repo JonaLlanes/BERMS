@@ -23,7 +23,26 @@ function presentEquipment(row) {
     notes: row.notes,
     created_at: row.created_at,
     updated_at: row.updated_at,
-    maintenance_status: maintenanceStatus(row.next_maintenance_date)
+    maintenance_status: maintenanceStatus(row.next_maintenance_date),
+    corrective_count: Number(row.corrective_count) || 0
+  };
+}
+
+function presentServiceRequest(row) {
+  return {
+    id: row.id,
+    request_number: row.request_number,
+    equipment_id: row.equipment_id,
+    equipment_name: row.equipment_name,
+    asset_tag: row.asset_tag,
+    department: row.department,
+    reported_by: row.reported_by,
+    priority: row.priority,
+    problem: row.problem,
+    status: row.status,
+    opened_on: dateOnly(row.opened_on),
+    closed_on: dateOnly(row.closed_on),
+    created_at: row.created_at
   };
 }
 
@@ -43,5 +62,6 @@ function presentHistory(row) {
 
 module.exports = {
   presentEquipment,
-  presentHistory
+  presentHistory,
+  presentServiceRequest
 };

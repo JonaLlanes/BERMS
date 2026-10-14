@@ -415,3 +415,52 @@ WHERE NOT EXISTS (
   SELECT 1 FROM maintenance_history h
   WHERE h.equipment_id = e.id AND h.maintenance_type = 'Asset Registration'
 );
+
+CREATE TABLE IF NOT EXISTS service_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  equipment_id INT NOT NULL,
+  request_number VARCHAR(20) NOT NULL,
+  reported_by VARCHAR(100) NOT NULL,
+  priority ENUM('Low', 'Medium', 'High') NOT NULL,
+  problem VARCHAR(1000) NOT NULL,
+  status ENUM('Open', 'In Progress', 'Waiting for Parts', 'Completed', 'Cancelled') NOT NULL DEFAULT 'Open',
+  opened_on DATE NOT NULL,
+  closed_on DATE NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_service_requests_number (request_number),
+  KEY idx_service_requests_status_opened (status, opened_on),
+  KEY idx_service_requests_equipment (equipment_id),
+  CONSTRAINT fk_service_requests_equipment
+    FOREIGN KEY (equipment_id) REFERENCES equipment(id)
+    ON DELETE RESTRICT
+) ENGINE=InnoDB;
+
+INSERT INTO service_requests (
+  equipment_id, request_number, reported_by, priority, problem, status, opened_on, closed_on
+)
+SELECT e.id, 'SR-1001', 'ED Nursing', 'High',
+  'Occlusion alarm keeps returning after the last corrective visit.',
+  'Open', DATE_SUB(CURDATE(), INTERVAL 2 DAY), NULL
+FROM equipment e
+WHERE e.asset_tag = 'IP-014'
+  AND NOT EXISTS (SELECT 1 FROM service_requests r WHERE r.request_number = 'SR-1001');
+
+INSERT INTO service_requests (
+  equipment_id, request_number, reported_by, priority, problem, status, opened_on, closed_on
+)
+SELECT e.id, 'SR-1002', 'Radiology Staff', 'Medium',
+  'Defibrillator remains in repair while parts are on order.',
+  'Waiting for Parts', DATE_SUB(CURDATE(), INTERVAL 6 DAY), NULL
+FROM equipment e
+WHERE e.asset_tag = 'DF-033'
+  AND NOT EXISTS (SELECT 1 FROM service_requests r WHERE r.request_number = 'SR-1002');
+
+INSERT INTO service_requests (
+  equipment_id, request_number, reported_by, priority, problem, status, opened_on, closed_on
+)
+SELECT e.id, 'SR-1003', 'ICU Nursing', 'Low',
+  'Alarm check requested after the last preventive maintenance.',
+  'Completed', DATE_SUB(CURDATE(), INTERVAL 4 DAY), CURDATE()
+FROM equipment e
+WHERE e.asset_tag = 'VN-208'
+  AND NOT EXISTS (SELECT 1 FROM service_requests r WHERE r.request_number = 'SR-1003');

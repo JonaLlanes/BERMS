@@ -1,4 +1,6 @@
 const { MAINTENANCE_STATUSES, PM_INTERVALS, nextPmDate, todayString } = require('./maintenance');
+const { REQUEST_PRIORITIES, REQUEST_STATUSES } = require('./serviceRequests');
+const { parseId } = require('./http');
 
 const ENGINEER_TYPES = ['In-House Engineer', 'Supplier Engineer'];
 
@@ -70,7 +72,7 @@ function validateEquipment(body) {
   if (!assetTag) errors.asset_tag = 'Asset tag is required.';
   else if (assetTag.length > 50) errors.asset_tag = 'Asset tag must be 50 characters or fewer.';
 
-  if (!category) errors.category = 'Category is required.';
+  if (!category) errors.category = 'Device category is required.';
   else if (!CATEGORIES.includes(category)) errors.category = 'Select a valid device category.';
 
   if (!manufacturer) errors.manufacturer = 'Manufacturer is required.';
@@ -250,6 +252,52 @@ function validateMaintenance(body) {
   };
 }
 
+function validateServiceRequest(body) {
+  const errors = {};
+  const source = body && typeof body === 'object' ? body : {};
+  const equipmentId = parseId(source.equipment_id);
+  const reportedBy = asText(source.reported_by);
+  const priority = asText(source.priority);
+  const problem = asText(source.problem);
+  const openedOn = asText(source.opened_on) || todayString();
+
+  if (!equipmentId) errors.equipment_id = 'Select a device.';
+  if (!reportedBy) errors.reported_by = 'Enter who reported the problem.';
+  else if (reportedBy.length > 100) errors.reported_by = 'Name must be 100 characters or fewer.';
+  if (!REQUEST_PRIORITIES.includes(priority)) errors.priority = 'Select a priority: low, medium, or high.';
+  if (!problem) errors.problem = 'Problem description is required.';
+  else if (problem.length > 1000) errors.problem = 'Problem description must be 1000 characters or fewer.';
+  if (!isRealDate(openedOn)) errors.opened_on = 'Date opened must be a valid date.';
+  else if (openedOn > todayString()) errors.opened_on = 'Date opened cannot be in the future.';
+
+  return {
+    errors,
+    value: {
+      equipment_id: equipmentId,
+      reported_by: reportedBy,
+      priority,
+      problem,
+      opened_on: openedOn
+    }
+  };
+}
+
+function parseRequestQuery(query) {
+  const errors = {};
+  const source = query && typeof query === 'object' ? query : {};
+  const status = asText(source.status);
+  if (status && !REQUEST_STATUSES.includes(status)) errors.status = 'Select a valid request status.';
+  return { errors, value: { status } };
+}
+
+function validateRequestStatus(body) {
+  const errors = {};
+  const source = body && typeof body === 'object' ? body : {};
+  const status = asText(source.status);
+  if (!REQUEST_STATUSES.includes(status)) errors.status = 'Select a valid request status.';
+  return { errors, value: { status } };
+}
+
 module.exports = {
   CATEGORIES,
   OPERATIONAL_STATUSES,
@@ -257,5 +305,8 @@ module.exports = {
   ENGINEER_TYPES,
   validateEquipment,
   parseListQuery,
-  validateMaintenance
+  validateMaintenance,
+  validateServiceRequest,
+  parseRequestQuery,
+  validateRequestStatus
 };

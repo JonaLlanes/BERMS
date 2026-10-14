@@ -63,6 +63,7 @@ assert.strictEqual(params[params.length - 1], today);
 
 const openEnded = buildEquipmentListQuery(parseListQuery({}).value, today);
 assert.strictEqual(openEnded.params.length, 0);
-assert.match(openEnded.sql, /^SELECT \* FROM equipment ORDER BY/);
+assert.match(openEnded.sql, /AS corrective_count/);
+assert.match(openEnded.sql, /FROM equipment ORDER BY next_maintenance_date IS NULL/);
 
 console.log('history and filter tests passed');

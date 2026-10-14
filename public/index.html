@@ -3,58 +3,83 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Biomedical Equipment Records</title>
+  <title>BERMS · Biomedical Equipment Records Management System</title>
   <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
   <header class="site-header">
     <div class="header-inner">
-      <p class="eyebrow">Biomedical Engineering</p>
-      <h1>Equipment records</h1>
+      <h1>BERMS · Biomedical Equipment Records Management System</h1>
+      <nav class="site-nav" aria-label="Sections">
+        <button type="button" class="nav-link active" data-view="inventory" aria-current="page">
+          <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M3 4.5h10M3 8h10M3 11.5h6"></path></svg>
+          Inventory
+        </button>
+        <button type="button" class="nav-link" data-view="operations">
+          <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="2" width="5" height="5" rx="1"></rect><rect x="9" y="2" width="5" height="5" rx="1"></rect><rect x="2" y="9" width="5" height="5" rx="1"></rect><rect x="9" y="9" width="5" height="5" rx="1"></rect></svg>
+          Operations
+        </button>
+        <button type="button" class="nav-link" data-view="requests">
+          <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2.5h6l2 2V13.5H4z"></path><path d="M6 8h4M6 10.5h3" stroke-linecap="round"></path></svg>
+          Service Requests
+        </button>
+        <button type="button" class="nav-link" data-view="reports">
+          <svg class="nav-icon" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M4 2.5h5.5L13 6v7.5H4z"></path><path d="M9.5 2.5V6H13"></path></svg>
+          Reports
+        </button>
+      </nav>
     </div>
   </header>
 
   <main class="page">
+    <section id="inventory-view">
+    <div class="view-head">
+      <h2 class="view-title">Inventory</h2>
+      <p class="view-lead">Summary cards always show the full inventory. Choose a card, or search and filter, to narrow the table.</p>
+    </div>
     <section class="metrics" id="metrics" aria-label="Inventory summary">
-      <p class="metric-caption">Devices</p>
+      <p class="metric-caption">Equipment</p>
       <div class="metric-row">
       <button class="metric active" type="button" data-metric="total" aria-pressed="true">
-        <span class="metric-value" id="metric-total">—</span>
         <span class="metric-label">Total</span>
+        <span class="metric-value" id="metric-total">—</span>
       </button>
-      <button class="metric" type="button" data-metric="in_service" aria-pressed="false">
-        <span class="metric-value" id="metric-in-service">—</span>
+      <button class="metric kpi-tone-green" type="button" data-metric="in_service" aria-pressed="false">
         <span class="metric-label">In service</span>
+        <span class="metric-value" id="metric-in-service">—</span>
       </button>
-      <button class="metric" type="button" data-metric="in_repair" aria-pressed="false">
-        <span class="metric-value" id="metric-under-maintenance">—</span>
+      <button class="metric kpi-tone-amber" type="button" data-metric="in_repair" aria-pressed="false">
         <span class="metric-label">In repair</span>
+        <span class="metric-value" id="metric-under-maintenance">—</span>
       </button>
-      <button class="metric" type="button" data-metric="out_of_service" aria-pressed="false">
-        <span class="metric-value" id="metric-out-of-service">—</span>
+      <button class="metric kpi-tone-red" type="button" data-metric="out_of_service" aria-pressed="false">
         <span class="metric-label">Out of service</span>
+        <span class="metric-value" id="metric-out-of-service">—</span>
       </button>
-      <button class="metric" type="button" data-metric="decommissioned" aria-pressed="false">
-        <span class="metric-value" id="metric-decommissioned">—</span>
+      <button class="metric kpi-tone-gray" type="button" data-metric="decommissioned" aria-pressed="false">
         <span class="metric-label">Decommissioned</span>
+        <span class="metric-value" id="metric-decommissioned">—</span>
       </button>
       </div>
       <p class="metric-caption">Preventive maintenance</p>
       <div class="metric-row metric-row-pm">
-      <button class="metric metric-warn" type="button" data-metric="due_soon" aria-pressed="false">
+      <button class="metric metric-warn kpi-tone-amber" type="button" data-metric="due_soon" aria-pressed="false">
+        <span class="metric-label">PM due</span>
         <span class="metric-value" id="metric-due-soon">—</span>
-        <span class="metric-label">Due</span>
       </button>
-      <button class="metric metric-danger" type="button" data-metric="overdue" aria-pressed="false">
-        <span class="metric-value" id="metric-overdue">—</span>
+      <button class="metric metric-danger kpi-tone-red" type="button" data-metric="overdue" aria-pressed="false">
         <span class="metric-label">Overdue</span>
+        <span class="metric-value" id="metric-overdue">—</span>
       </button>
       </div>
     </section>
 
     <section class="toolbar" aria-label="Equipment actions">
+      <div class="toolbar-head">
+        <h3 class="panel-title">Search and filters</h3>
+      </div>
       <form id="search-form" class="filters" role="search">
-        <div>
+        <div class="search-field">
           <label for="search">Search</label>
           <input id="search" name="q" type="search" placeholder="Device, asset tag, serial number, clinical department" autocomplete="off">
         </div>
@@ -63,7 +88,7 @@
           <select id="maintenance-filter">
             <option value="">All PM statuses</option>
             <option>Not Scheduled</option>
-            <option>Current</option>
+            <option>On Schedule</option>
             <option>Due</option>
             <option>Overdue</option>
           </select>
@@ -104,7 +129,7 @@
         <div>
           <label for="department-filter">Clinical department</label>
           <select id="department-filter">
-            <option value="">All departments</option>
+            <option value="">All clinical departments</option>
           </select>
         </div>
       </form>
@@ -127,16 +152,327 @@
             <th scope="col">Next PM due</th>
             <th scope="col">PM status</th>
             <th scope="col">Operational status</th>
-            <th scope="col"><span class="sr-only">Actions</span></th>
           </tr>
         </thead>
         <tbody id="equipment-body">
           <tr>
-            <td colspan="7" class="empty">Loading device records…</td>
+            <td colspan="6" class="empty">Loading device records…</td>
           </tr>
         </tbody>
       </table>
     </div>
+    </section>
+
+    <section id="operations-view" hidden>
+      <div class="dash-intro">
+        <h2 class="view-title">Operations dashboard</h2>
+        <p>Read the fleet from current status through the work that needs attention. Filters apply to every card, chart, and list.</p>
+      </div>
+      <p id="operations-banner" class="banner" role="status" hidden></p>
+
+      <section id="dashboard-filters" class="slicer-panel" aria-label="Dashboard filters">
+        <div class="slicer-toolbar">
+          <h3 class="dash-section">Filters</h3>
+          <button type="button" id="reset-dashboard-filters" class="button reset">Reset filters</button>
+        </div>
+        <div class="slicer-grid">
+          <div class="slicer" id="slicer-department" data-label="Clinical department"></div>
+          <div class="slicer" id="slicer-category" data-label="Device category"></div>
+          <div class="slicer" id="slicer-operational" data-label="Operational status"></div>
+          <div class="slicer" id="slicer-request" data-label="Service request status"></div>
+        </div>
+        <div id="dashboard-active-filters" class="active-filters" hidden></div>
+      </section>
+
+      <section class="dash-block" aria-label="Operational status">
+        <header class="dash-heading">
+          <span class="dash-step">01</span>
+          <div>
+            <h3 class="dash-section">Operational status</h3>
+            <p class="dash-lead">How the filtered fleet is operating right now.</p>
+          </div>
+        </header>
+        <div class="kpi-grid">
+          <div class="metric metric-static kpi-tone-blue">
+            <span class="metric-label">Total equipment</span>
+            <span class="metric-value" id="ops-total">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-blue">
+            <span class="metric-label">Active equipment</span>
+            <span class="metric-value" id="ops-active">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-amber">
+            <span class="metric-label">In repair</span>
+            <span class="metric-value" id="ops-in-repair">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-red">
+            <span class="metric-label">Out of service</span>
+            <span class="metric-value" id="ops-out-of-service">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-gray">
+            <span class="metric-label">Decommissioned</span>
+            <span class="metric-value" id="ops-decommissioned">—</span>
+          </div>
+        </div>
+        <div class="dash-grid">
+          <article class="dash-card">
+            <h3>Equipment operational status</h3>
+            <div id="chart-operational" class="chart-host">Loading chart…</div>
+          </article>
+          <aside class="dash-callout">
+            <h3>Active equipment</h3>
+            <p>Active equipment is every device that is not decommissioned.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="dash-block" aria-label="PM compliance">
+        <header class="dash-heading">
+          <span class="dash-step">02</span>
+          <div>
+            <h3 class="dash-section">PM compliance</h3>
+            <p class="dash-lead">Preventive maintenance against the active fleet.</p>
+          </div>
+        </header>
+        <div class="kpi-grid">
+          <div class="metric metric-static metric-warn kpi-tone-amber" id="ops-due-card">
+            <span class="metric-label">PM due</span>
+            <span class="metric-value" id="ops-due">—</span>
+          </div>
+          <div class="metric metric-static metric-danger kpi-tone-red" id="ops-overdue-card">
+            <span class="metric-label">PM overdue</span>
+            <span class="metric-value" id="ops-overdue">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-green">
+            <span class="metric-label">PM on-schedule rate</span>
+            <span class="metric-value" id="ops-on-schedule-rate">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-green">
+            <span class="metric-label">PM on schedule</span>
+            <span class="metric-value" id="ops-current">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-gray">
+            <span class="metric-label">PM not scheduled</span>
+            <span class="metric-value" id="ops-not-scheduled">—</span>
+          </div>
+        </div>
+        <div class="dash-grid">
+          <article class="dash-card">
+            <h3>Preventive maintenance status</h3>
+            <p class="dash-note">Counts active devices. Decommissioned equipment is left out of PM status.</p>
+            <div id="chart-pm" class="chart-host">Loading chart…</div>
+          </article>
+          <aside class="dash-callout">
+            <h3>On-schedule rate</h3>
+            <p>The on-schedule rate is On Schedule divided by On Schedule, Due, and Overdue. Not Scheduled and decommissioned devices are left out.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section class="dash-block" aria-label="Equipment availability">
+        <header class="dash-heading">
+          <span class="dash-step">03</span>
+          <div>
+            <h3 class="dash-section">Equipment availability</h3>
+            <p class="dash-lead">Devices that can be used, and devices that cannot.</p>
+          </div>
+        </header>
+        <div class="kpi-grid cols-2">
+          <div class="metric metric-static kpi-tone-green">
+            <span class="metric-label">Available equipment</span>
+            <span class="metric-value" id="ops-available">—</span>
+          </div>
+          <div class="metric metric-static metric-warn kpi-tone-amber" id="ops-unavailable-card">
+            <span class="metric-label">Unavailable equipment</span>
+            <span class="metric-value" id="ops-unavailable">—</span>
+          </div>
+        </div>
+        <p class="summary">Available equipment is In Service. Unavailable equipment is In Repair plus Out of Service.</p>
+      </section>
+
+      <section class="dash-block" aria-label="Open work backlog">
+        <header class="dash-heading">
+          <span class="dash-step">04</span>
+          <div>
+            <h3 class="dash-section">Open work backlog</h3>
+            <p class="dash-lead">Service requests still moving, plus age and priority.</p>
+          </div>
+        </header>
+        <p id="ops-requests-banner" class="banner" role="status" hidden></p>
+        <div class="kpi-grid">
+          <div class="metric metric-static kpi-tone-blue">
+            <span class="metric-label">Open requests</span>
+            <span class="metric-value" id="ops-requests-open">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-green">
+            <span class="metric-label">In progress</span>
+            <span class="metric-value" id="ops-requests-progress">—</span>
+          </div>
+          <div class="metric metric-static metric-warn kpi-tone-amber" id="ops-requests-parts-card">
+            <span class="metric-label">Waiting for parts</span>
+            <span class="metric-value" id="ops-requests-parts">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-blue">
+            <span class="metric-label">Open work backlog</span>
+            <span class="metric-value" id="ops-open-work">—</span>
+          </div>
+          <div class="metric metric-static metric-danger kpi-tone-red" id="ops-high-priority-card">
+            <span class="metric-label">High priority open work</span>
+            <span class="metric-value" id="ops-high-priority">—</span>
+          </div>
+          <div class="metric metric-static kpi-tone-blue">
+            <span class="metric-label">Completed this month</span>
+            <span class="metric-value" id="ops-requests-completed">—</span>
+          </div>
+          <div class="metric metric-static metric-warn kpi-tone-amber" id="ops-oldest-age-card">
+            <span class="metric-label">Oldest open request (days)</span>
+            <span class="metric-value" id="ops-oldest-age">—</span>
+          </div>
+        </div>
+        <div class="dash-grid">
+          <article class="dash-card">
+            <h3>Service request status</h3>
+            <p class="dash-note">Requests for the equipment in the current filters. Completed this month stays in the KPI above.</p>
+            <div id="chart-requests" class="chart-host">Loading chart…</div>
+          </article>
+          <article class="dash-card">
+            <h3>Service request priority</h3>
+            <div id="chart-priority" class="chart-host">Loading chart…</div>
+          </article>
+        </div>
+        <article class="dash-card">
+          <h3>Open request age</h3>
+          <p class="dash-note">Age is today's date minus the opened date, for Open, In Progress, and Waiting for Parts.</p>
+          <div id="open-work-age" class="chart-host">Loading chart…</div>
+        </article>
+      </section>
+
+      <section class="dash-block" aria-label="Department demand">
+        <header class="dash-heading">
+          <span class="dash-step">05</span>
+          <div>
+            <h3 class="dash-section">Department demand</h3>
+            <p class="dash-lead">Where equipment and service requests are concentrated.</p>
+          </div>
+        </header>
+        <p class="dash-note">Request counts leave out cancelled requests and follow the filters above.</p>
+        <div class="kpi-grid fit-content">
+          <div class="metric metric-static kpi-tone-blue">
+            <span class="metric-label">Requests per active equipment</span>
+            <span class="metric-value" id="ops-requests-per-device">—</span>
+          </div>
+        </div>
+        <div class="dash-grid">
+          <article class="dash-card">
+            <h3>Equipment by department</h3>
+            <div id="chart-department" class="chart-host">Loading chart…</div>
+          </article>
+          <article class="dash-card">
+            <h3>Equipment by category</h3>
+            <div id="chart-category" class="chart-host">Loading chart…</div>
+          </article>
+          <article class="dash-card">
+            <h3>Requests by department</h3>
+            <div id="chart-requests-department" class="chart-host">Loading chart…</div>
+          </article>
+          <article class="dash-card">
+            <h3>Requests by category</h3>
+            <div id="chart-requests-category" class="chart-host">Loading chart…</div>
+          </article>
+        </div>
+      </section>
+
+      <section class="dash-block" aria-label="Equipment reliability">
+        <header class="dash-heading">
+          <span class="dash-step">06</span>
+          <div>
+            <h3 class="dash-section">Equipment reliability</h3>
+            <p class="dash-lead">Devices drawing the most service requests.</p>
+          </div>
+        </header>
+        <article class="dash-card">
+          <h3>Most service requests</h3>
+          <div id="chart-most-requests" class="chart-host">Loading chart…</div>
+        </article>
+      </section>
+
+      <section class="dash-block" aria-label="Requests requiring attention">
+        <header class="dash-heading">
+          <span class="dash-step">07</span>
+          <div>
+            <h3 class="dash-section">Requests requiring attention</h3>
+            <p class="dash-lead">Equipment with repeated requests or corrective visits.</p>
+          </div>
+        </header>
+        <article class="dash-card attention-card">
+          <h3>Repeated attention</h3>
+          <p class="dash-note">Corrective visits are the device total. Repeated attention is two or more requests, or two or more corrective visits.</p>
+          <div id="attention-list" class="chart-host">Loading chart…</div>
+        </article>
+      </section>
+    </section>
+
+    <section id="requests-view" hidden>
+      <div class="view-head">
+        <h2 class="view-title">Service requests</h2>
+        <p class="view-lead">Open a request against a device, then update its status as the work moves forward.</p>
+      </div>
+      <p id="requests-banner" class="banner" role="status" hidden></p>
+      <section class="toolbar" aria-label="Service request actions">
+        <div class="toolbar-head">
+          <h3 class="panel-title">Filter by status</h3>
+        </div>
+        <form id="request-filter-form" class="request-filter">
+          <div>
+            <label for="request-status-filter">Status</label>
+            <select id="request-status-filter">
+              <option value="">All statuses</option>
+              <option>Open</option>
+              <option>In Progress</option>
+              <option>Waiting for Parts</option>
+              <option>Completed</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
+        </form>
+        <div class="toolbar-actions">
+          <button id="add-request-button" class="button primary" type="button">New request</button>
+        </div>
+      </section>
+      <p id="request-count" class="summary" aria-live="polite"></p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Request number</th>
+              <th scope="col">Equipment</th>
+              <th scope="col">Reported by</th>
+              <th scope="col">Priority</th>
+              <th scope="col">Problem description</th>
+              <th scope="col">Status</th>
+              <th scope="col">Date opened</th>
+              <th scope="col">Date closed</th>
+            </tr>
+          </thead>
+          <tbody id="requests-body">
+            <tr>
+              <td colspan="8" class="empty">Loading service requests…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="reports-view" hidden>
+      <div class="dash-intro">
+        <h2 class="view-title">Report center</h2>
+        <p>Download operational reports for meetings and audits. Each file is a CSV you can open in Excel or Power BI.</p>
+      </div>
+      <p id="reports-banner" class="banner" role="status" hidden></p>
+      <div id="report-center" class="report-center">
+        <p class="summary">Loading reports…</p>
+      </div>
+    </section>
   </main>
 
   <dialog id="form-dialog" aria-labelledby="form-title">
@@ -243,12 +579,12 @@
 
   <dialog id="history-dialog" aria-labelledby="history-title">
     <div class="dialog-heading">
-      <h2 id="history-title">Service history</h2>
+      <h2 id="history-title">Equipment history</h2>
       <button class="icon-button" type="button" data-close="history" aria-label="Close">×</button>
     </div>
     <p id="history-meta" class="history-meta"></p>
     <dl id="device-facts" class="facts"></dl>
-    <h3 class="section-label">Service history</h3>
+    <h3 class="section-label">Equipment history</h3>
     <p id="history-message" class="form-note" hidden></p>
     <div id="history-list" class="history-list"></div>
     <form id="history-form" novalidate>
@@ -315,6 +651,55 @@
     </form>
   </dialog>
 
+  <dialog id="request-dialog" aria-labelledby="request-title">
+    <form id="request-form" novalidate>
+      <div class="dialog-heading">
+        <h2 id="request-title">New request</h2>
+        <button class="icon-button" type="button" data-close="request" aria-label="Close">×</button>
+      </div>
+      <p id="request-form-error" class="form-error" hidden></p>
+      <div class="fields">
+        <div class="field">
+          <label for="equipment_id">Equipment</label>
+          <select id="equipment_id" name="equipment_id" required>
+            <option value="">Select a device</option>
+          </select>
+          <p class="field-error" id="equipment_id-error"></p>
+        </div>
+        <div class="field">
+          <label for="reported_by">Reported by</label>
+          <input id="reported_by" name="reported_by" maxlength="100" required>
+          <p class="field-error" id="reported_by-error"></p>
+        </div>
+        <div class="field">
+          <label for="priority">Priority</label>
+          <select id="priority" name="priority" required>
+            <option value="">Select a priority</option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
+          </select>
+          <p class="field-error" id="priority-error"></p>
+        </div>
+        <div class="field">
+          <label for="opened_on">Date opened</label>
+          <input id="opened_on" name="opened_on" type="date" required>
+          <p class="field-error" id="opened_on-error"></p>
+        </div>
+        <div class="field field-wide">
+          <label for="problem">Problem description</label>
+          <textarea id="problem" name="problem" maxlength="1000" rows="3" required></textarea>
+          <p class="field-error" id="problem-error"></p>
+        </div>
+      </div>
+      <div class="dialog-actions">
+        <button class="button ghost" type="button" data-close="request">Cancel</button>
+        <button class="button primary" type="submit">Save request</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="/js/dashboardFilter.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>

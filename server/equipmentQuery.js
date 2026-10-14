@@ -47,7 +47,13 @@ function buildEquipmentListQuery(filters, today = todayString()) {
   }
 
   const clause = where.length ? ` WHERE ${where.join(' AND ')}` : '';
-  const sql = `SELECT * FROM equipment${clause} ORDER BY next_maintenance_date IS NULL, next_maintenance_date ASC, equipment_name ASC`;
+  const sql = `SELECT equipment.*, (
+    SELECT COUNT(*)
+    FROM maintenance_history
+    WHERE maintenance_history.equipment_id = equipment.id
+      AND maintenance_history.maintenance_type = 'Corrective Maintenance'
+  ) AS corrective_count
+  FROM equipment${clause} ORDER BY next_maintenance_date IS NULL, next_maintenance_date ASC, equipment_name ASC`;
   return { sql, params };
 }
 

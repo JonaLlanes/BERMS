@@ -39,6 +39,18 @@ const PM_SCHEDULE_TYPES = [
 
 const ENGINEER_TYPES = ['In-House Engineer', 'Supplier Engineer'];
 
+const REQUEST_STATUSES = [
+  'Open',
+  'In Progress',
+  'Waiting for Parts',
+  'Completed',
+  'Cancelled'
+];
+
+const REQUEST_PRIORITIES = ['Low', 'Medium', 'High'];
+
+const REQUEST_FIELDS = ['equipment_id', 'reported_by', 'priority', 'problem', 'opened_on'];
+
 const FIELD_NAMES = [
   'equipment_name',
   'asset_tag',
@@ -78,11 +90,47 @@ const historyMeta = document.querySelector('#history-meta');
 const deviceFacts = document.querySelector('#device-facts');
 const historyMessage = document.querySelector('#history-message');
 const historyList = document.querySelector('#history-list');
-const metricButtons = [...document.querySelectorAll('[data-metric]')];
+const metricButtons = [...document.querySelectorAll('#metrics [data-metric]')];
+const inventoryView = document.querySelector('#inventory-view');
+const operationsView = document.querySelector('#operations-view');
+const operationsBanner = document.querySelector('#operations-banner');
+const opsRequestsBanner = document.querySelector('#ops-requests-banner');
+const requestsView = document.querySelector('#requests-view');
+const reportsView = document.querySelector('#reports-view');
+const reportsBanner = document.querySelector('#reports-banner');
+const reportCenter = document.querySelector('#report-center');
+const requestsBanner = document.querySelector('#requests-banner');
+const requestsBody = document.querySelector('#requests-body');
+const requestCount = document.querySelector('#request-count');
+const requestStatusFilter = document.querySelector('#request-status-filter');
+const requestDialog = document.querySelector('#request-dialog');
+const requestForm = document.querySelector('#request-form');
+const requestFormError = document.querySelector('#request-form-error');
+const chartOperational = document.querySelector('#chart-operational');
+const chartPm = document.querySelector('#chart-pm');
+const chartDepartment = document.querySelector('#chart-department');
+const chartCategory = document.querySelector('#chart-category');
+const chartRequests = document.querySelector('#chart-requests');
+const chartPriority = document.querySelector('#chart-priority');
+const chartMostRequests = document.querySelector('#chart-most-requests');
+const chartRequestDepartment = document.querySelector('#chart-requests-department');
+const chartRequestCategory = document.querySelector('#chart-requests-category');
+const openWorkAge = document.querySelector('#open-work-age');
+const attentionList = document.querySelector('#attention-list');
+const navButtons = [...document.querySelectorAll('.nav-link')];
 
 let records = [];
 let historyEquipment = null;
 let searchTimer = null;
+let reportCatalog = [];
+let dashboardEquipment = null;
+let dashboardRequests = null;
+const dashboardFilters = {
+  department: '',
+  category: '',
+  operational_status: '',
+  request_status: ''
+};
 
 function todayString() {
   const now = new Date();
@@ -305,6 +353,259 @@ function applyMetric(name) {
   loadEquipment().catch(() => showBanner('Could not reach the server.', true));
 }
 
+function showOperationsBanner(message, isError) {
+  operationsBanner.hidden = false;
+  operationsBanner.textContent = message;
+  operationsBanner.classList.toggle('error', Boolean(isError));
+}
+
+function clearOperationsBanner() {
+  operationsBanner.hidden = true;
+  operationsBanner.textContent = '';
+  operationsBanner.classList.remove('error');
+}
+
+function formatOnScheduleRate(summary) {
+  const denominator = summary.current + summary.due_soon + summary.overdue;
+  if (!denominator) return '—';
+  return formatPercent(summary.current, denominator);
+}
+
+function formatRequestsPerDevice(rate) {
+  if (rate == null || Number.isNaN(Number(rate))) return '—';
+  const rounded = Math.round(Number(rate) * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function formatPercent(count, total) {
+  if (!total) return '0%';
+  const rounded = Math.round((count / total) * 1000) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}%`;
+}
+
+function chartSummary(title, items, total) {
+  const parts = items.map((item) => `${item.label} ${item.count} (${formatPercent(item.count, total)})`);
+  return `${title}. ${parts.join('. ')}.`;
+}
+
+function setChartMessage(host, message) {
+  if (!host) return;
+  host.innerHTML = `<p class="chart-empty">${escapeHtml(message)}</p>`;
+}
+
+function legendHtml(items, total) {
+  return `<ul class="chart-legend">${items.map((item) => `
+    <li>
+      <span class="swatch" style="background:${item.color}"></span>
+      <span class="legend-label" title="${escapeHtml(item.label)}">${escapeHtml(item.label)}</span>
+      <span class="legend-value">${item.count}</span>
+      <span class="legend-pct">${formatPercent(item.count, total)}</span>
+    </li>
+  `).join('')}</ul>`;
+}
+
+function arcPath(cx, cy, radius, start, end) {
+  const startX = cx + radius * Math.cos(start);
+  const startY = cy + radius * Math.sin(start);
+  const endX = cx + radius * Math.cos(end);
+  const endY = cy + radius * Math.sin(end);
+  const large = end - start > Math.PI ? 1 : 0;
+  return `M ${startX.toFixed(2)} ${startY.toFixed(2)} A ${radius} ${radius} 0 ${large} 1 ${endX.toFixed(2)} ${endY.toFixed(2)}`;
+}
+
+function donutArcs(items, total) {
+  const active = items.filter((item) => item.count > 0);
+  if (!total || active.length === 0) return [];
+  if (active.length === 1) return [{ ...active[0], full: true }];
+  const gap = 0.045;
+  let angle = -Math.PI / 2;
+  return active.map((item) => {
+    const sweep = (item.count / total) * Math.PI * 2;
+    const inset = sweep > gap * 3 ? gap / 2 : 0;
+    const arc = { ...item, start: angle + inset, end: angle + sweep - inset };
+    angle += sweep;
+    return arc;
+  });
+}
+
+function renderDonut(host, items, { title, centerLabel }) {
+  if (!host) return;
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+  const arcs = donutArcs(items, total).map((arc) => {
+    if (arc.full) {
+      return `<circle cx="60" cy="60" r="42" fill="none" stroke="${arc.color}" stroke-width="16"></circle>`;
+    }
+    return `<path d="${arcPath(60, 60, 42, arc.start, arc.end)}" fill="none" stroke="${arc.color}" stroke-width="16"></path>`;
+  }).join('');
+  host.innerHTML = `
+    <div class="chart-layout" role="img" aria-label="${escapeHtml(chartSummary(title, items, total))}">
+      <svg class="donut" viewBox="0 0 120 120" aria-hidden="true">
+        <circle cx="60" cy="60" r="42" fill="none" stroke="var(--chart-track)" stroke-width="16"></circle>
+        ${arcs}
+        <text class="donut-total" x="60" y="58" text-anchor="middle">${total}</text>
+        <text class="donut-caption" x="60" y="74" text-anchor="middle">${escapeHtml(centerLabel)}</text>
+      </svg>
+      ${legendHtml(items, total)}
+    </div>
+  `;
+}
+
+function sortByCountDesc(rows, labelKey) {
+  return rows
+    .map((row) => ({ label: row[labelKey], count: row.count }))
+    .sort((left, right) => right.count - left.count || String(left.label).localeCompare(String(right.label)));
+}
+
+function renderHorizontalBars(host, rows, color, seriesLabel, emptyMessage = 'No devices yet.') {
+  if (!host) return;
+  if (!rows.length) {
+    setChartMessage(host, emptyMessage);
+    return;
+  }
+  const max = Math.max(...rows.map((row) => row.count), 1);
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
+  const bars = rows.map((row) => {
+    const width = row.count === 0 ? 0 : Math.max((row.count / max) * 100, 1.5);
+    return `
+      <div class="bar-row">
+        <span class="bar-label" title="${escapeHtml(row.label)}">${escapeHtml(row.label)}</span>
+        <svg class="bar-svg" viewBox="0 0 100 10" preserveAspectRatio="none" aria-hidden="true">
+          <rect width="100" height="10" rx="2" fill="var(--chart-track)"></rect>
+          <rect width="${width.toFixed(2)}" height="10" rx="2" fill="${color}"></rect>
+        </svg>
+        <span class="bar-count">${row.count}</span>
+        <span class="bar-pct">${formatPercent(row.count, total)}</span>
+      </div>
+    `;
+  }).join('');
+  const summary = rows.map((row) => `${row.label} ${row.count} (${formatPercent(row.count, total)})`).join('. ');
+  host.innerHTML = `
+    <div class="bar-chart" role="img" aria-label="${escapeHtml(`${seriesLabel}. ${summary}.`)}">
+      ${bars}
+      <ul class="chart-legend">
+        <li>
+          <span class="swatch" style="background:${color}"></span>
+          <span class="legend-label">${escapeHtml(seriesLabel)}</span>
+          <span class="legend-value">${total}</span>
+          <span class="legend-pct">${total ? '100%' : '0%'}</span>
+        </li>
+      </ul>
+    </div>
+  `;
+}
+
+function renderColumnChart(host, items, title) {
+  if (!host) return;
+  const width = 360;
+  const height = 220;
+  const padLeft = 16;
+  const padRight = 16;
+  const base = 176;
+  const top = 28;
+  const plotHeight = base - top;
+  const max = Math.max(...items.map((item) => item.count), 1);
+  const total = items.reduce((sum, item) => sum + item.count, 0);
+  const slot = (width - padLeft - padRight) / items.length;
+  const bars = items.map((item, index) => {
+    const barHeight = item.count === 0 ? 0 : Math.max((item.count / max) * plotHeight, 2);
+    const x = padLeft + index * slot + (slot - 44) / 2;
+    const y = base - barHeight;
+    return `
+      <rect x="${x.toFixed(2)}" y="${y.toFixed(2)}" width="44" height="${barHeight.toFixed(2)}" rx="2" fill="${item.color}"></rect>
+      <text class="col-value" x="${(x + 22).toFixed(2)}" y="${Math.max(y - 8, 16).toFixed(2)}" text-anchor="middle">${item.count}</text>
+      <text class="col-label" x="${(x + 22).toFixed(2)}" y="200" text-anchor="middle">${escapeHtml(item.label)}</text>
+    `;
+  }).join('');
+  host.innerHTML = `
+    <div role="img" aria-label="${escapeHtml(chartSummary(title, items, total))}">
+      <svg class="column-chart" viewBox="0 0 ${width} ${height}" aria-hidden="true">
+        <line x1="${padLeft}" y1="${base}" x2="${width - padRight}" y2="${base}" stroke="#e0e0e0"></line>
+        ${bars}
+      </svg>
+      ${legendHtml(items, total)}
+    </div>
+  `;
+}
+
+function countLabeled(rows, key, order) {
+  const counts = new Map(order.map((item) => [item.label, 0]));
+  for (const row of rows) {
+    const label = row[key];
+    if (counts.has(label)) counts.set(label, counts.get(label) + 1);
+  }
+  return order.map((item) => ({ ...item, count: counts.get(item.label) }));
+}
+
+function renderOperations(summary, emptyMessage = 'No devices yet.') {
+  const active = summary.total - summary.decommissioned;
+  const values = {
+    'ops-total': summary.total,
+    'ops-active': active,
+    'ops-in-repair': summary.in_repair,
+    'ops-out-of-service': summary.out_of_service,
+    'ops-available': summary.available ?? summary.in_service,
+    'ops-unavailable': summary.unavailable ?? (summary.in_repair + summary.out_of_service),
+    'ops-decommissioned': summary.decommissioned,
+    'ops-due': summary.due_soon,
+    'ops-overdue': summary.overdue,
+    'ops-current': summary.current,
+    'ops-not-scheduled': summary.not_scheduled
+  };
+  for (const [id, value] of Object.entries(values)) {
+    document.querySelector(`#${id}`).textContent = value;
+  }
+  document.querySelector('#ops-due-card').classList.toggle('has-count', summary.due_soon > 0);
+  document.querySelector('#ops-overdue-card').classList.toggle('has-count', summary.overdue > 0);
+  document.querySelector('#ops-unavailable-card').classList.toggle('has-count', (summary.unavailable ?? 0) > 0);
+  document.querySelector('#ops-on-schedule-rate').textContent = formatOnScheduleRate(summary);
+  renderDonut(chartOperational, [
+    { label: 'In Service', count: summary.in_service, color: 'var(--ok)' },
+    { label: 'In Repair', count: summary.in_repair, color: 'var(--chart-amber)' },
+    { label: 'Out of Service', count: summary.out_of_service, color: 'var(--danger)' },
+    { label: 'Decommissioned', count: summary.decommissioned, color: 'var(--chart-gray)' }
+  ], { title: 'Equipment Operational Status', centerLabel: 'equipment' });
+  renderDonut(chartPm, [
+    { label: 'On Schedule', count: summary.current, color: 'var(--ok)' },
+    { label: 'Due', count: summary.due_soon, color: 'var(--chart-amber)' },
+    { label: 'Overdue', count: summary.overdue, color: 'var(--danger)' },
+    { label: 'Not Scheduled', count: summary.not_scheduled, color: 'var(--chart-gray)' }
+  ], { title: 'Preventive Maintenance Status', centerLabel: 'active' });
+  renderHorizontalBars(
+    chartDepartment,
+    sortByCountDesc(summary.by_department || [], 'department'),
+    'var(--blue)',
+    'Equipment count',
+    emptyMessage
+  );
+  renderHorizontalBars(
+    chartCategory,
+    sortByCountDesc(summary.by_category || [], 'category'),
+    'var(--chart-teal)',
+    'Equipment count',
+    emptyMessage
+  );
+}
+
+function showView(name) {
+  inventoryView.hidden = name !== 'inventory';
+  operationsView.hidden = name !== 'operations';
+  requestsView.hidden = name !== 'requests';
+  reportsView.hidden = name !== 'reports';
+  for (const button of navButtons) {
+    const active = button.dataset.view === name;
+    button.classList.toggle('active', active);
+    if (active) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  if (name === 'operations') {
+    loadDashboardEquipment().catch(() => showOperationsBanner('Could not reach the server.', true));
+    loadRequests().catch(() => showRequestBanner('Could not reach the server.', true));
+  }
+  if (name === 'reports') {
+    loadReports().catch(() => showReportsBanner('Could not reach the server.', true));
+  }
+}
+
 function renderMetrics(summary) {
   const values = {
     'metric-total': summary.total,
@@ -334,6 +635,17 @@ function renderMetrics(summary) {
   departmentFilter.innerHTML = options.join('');
 }
 
+function emptyRow(columns, message) {
+  return `<tr><td colspan="${columns}" class="empty"><div class="empty-state"><p>${escapeHtml(message)}</p></div></td></tr>`;
+}
+
+function equipmentRowClass(row) {
+  if (row.maintenance_status === 'Overdue' || row.operational_status === 'Out of Service') return 'row-alert';
+  if (row.maintenance_status === 'Due' || row.operational_status === 'In Repair') return 'row-warn';
+  if (row.operational_status === 'Decommissioned') return 'row-muted';
+  return '';
+}
+
 function renderTable(rows) {
   records = rows;
   const noun = rows.length === 1 ? 'record' : 'records';
@@ -342,16 +654,14 @@ function renderTable(rows) {
     const message = filtersActive()
       ? 'No devices match these filters.'
       : 'No devices yet. Add a device to start tracking PM dates.';
-    tbody.innerHTML = `<tr><td colspan="7" class="empty">${message}</td></tr>`;
+    tbody.innerHTML = emptyRow(6, message);
     return;
   }
 
   tbody.innerHTML = rows.map((row) => `
-    <tr>
+    <tr class="record-row ${equipmentRowClass(row)}" data-id="${row.id}" tabindex="0">
       <td>
-        <div class="equip-name">
-          <button type="button" class="name-button" data-action="history" data-id="${row.id}">${escapeHtml(row.equipment_name)}</button>
-        </div>
+        <div class="equip-name">${escapeHtml(row.equipment_name)}</div>
         <div class="equip-meta"><span class="tag">${escapeHtml(row.asset_tag)}</span> · ${escapeHtml(row.manufacturer)} ${escapeHtml(row.model_number)}</div>
       </td>
       <td class="nowrap">${escapeHtml(row.department)}</td>
@@ -359,12 +669,6 @@ function renderTable(rows) {
       <td class="nowrap">${showDate(row.next_maintenance_date)}${row.pm_interval ? `<div class="equip-meta">${escapeHtml(row.pm_interval)}</div>` : ''}</td>
       <td><span class="badge ${statusClass(row.maintenance_status)}">${escapeHtml(row.maintenance_status)}</span></td>
       <td class="service"><span class="op ${opClass(row.operational_status)}">${escapeHtml(row.operational_status)}</span></td>
-      <td>
-        <div class="row-actions">
-          <button type="button" data-action="history" data-id="${row.id}">Open</button>
-          <button type="button" data-action="edit" data-id="${row.id}">Edit</button>
-        </div>
-      </td>
     </tr>
   `).join('');
 }
@@ -373,10 +677,18 @@ async function loadSummary() {
   const response = await fetch('/api/summary');
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    showBanner(data.errors?.form || 'Could not load inventory totals.', true);
+    const message = data.errors?.form || 'Could not load inventory totals.';
+    showBanner(message, true);
+    showOperationsBanner(message, true);
+    for (const host of [chartOperational, chartPm, chartDepartment, chartCategory, chartMostRequests, chartRequestDepartment, chartRequestCategory, openWorkAge, attentionList]) {
+      setChartMessage(host, message);
+    }
     return;
   }
+  clearOperationsBanner();
   renderMetrics(data);
+  if (dashboardEquipment && dashboardRequests) applyDashboard();
+  else if (!dashboardFiltersActive()) renderOperations(data);
 }
 
 async function loadEquipment() {
@@ -386,7 +698,7 @@ async function loadEquipment() {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = data.errors?.form || data.errors?.maintenance_status || 'Could not load device records.';
-    tbody.innerHTML = `<tr><td colspan="7" class="empty">${escapeHtml(message)}</td></tr>`;
+    tbody.innerHTML = emptyRow(6, message);
     resultCount.textContent = '';
     showBanner(message, true);
     return;
@@ -476,18 +788,18 @@ function fillFacts(equipment) {
     ['Asset tag', equipment.asset_tag],
     ['Serial number', equipment.serial_number],
     ['Manufacturer', equipment.manufacturer],
-    ['Model', equipment.model_number],
-    ['Category', equipment.category],
-    ['Department', equipment.department],
+    ['Model number', equipment.model_number],
+    ['Device category', equipment.category],
+    ['Clinical department', equipment.department],
     ['PM schedule', equipment.pm_interval || 'Not set'],
-    ['Last PM', showDate(equipment.last_maintenance_date)],
-    ['Next PM due', showDate(equipment.next_maintenance_date)],
+    ['Last PM date', showDate(equipment.last_maintenance_date)],
+    ['Next PM due date', showDate(equipment.next_maintenance_date)],
     ['Notes', equipment.notes || 'None']
   ];
   deviceFacts.innerHTML = rows.map(([label, value]) => `
     <div>
       <dt>${escapeHtml(label)}</dt>
-      <dd>${label === 'Last PM' || label === 'Next PM due' ? value : escapeHtml(value)}</dd>
+      <dd>${label === 'Last PM date' || label === 'Next PM due date' ? value : escapeHtml(value)}</dd>
     </div>
   `).join('') + `
     <div>
@@ -509,7 +821,7 @@ function showHistoryNote(message, isError) {
 
 function renderHistory(rows) {
   if (!rows.length) {
-    historyList.innerHTML = '<p class="empty">No service recorded for this device yet.</p>';
+    historyList.innerHTML = '<div class="empty-state"><p>No equipment history yet.</p></div>';
     return;
   }
   historyList.innerHTML = `<ol class="timeline">${rows.map((row) => `
@@ -534,11 +846,11 @@ async function openHistory(id) {
   const equipment = await equipmentResponse.json().catch(() => ({}));
   const history = await historyResponse.json().catch(() => ({}));
   if (!equipmentResponse.ok) {
-    showBanner(equipment.errors?.form || 'Could not open service history.', true);
+    showBanner(equipment.errors?.form || 'Could not open equipment history.', true);
     return;
   }
   if (!historyResponse.ok) {
-    showBanner(history.errors?.form || 'Could not open service history.', true);
+    showBanner(history.errors?.form || 'Could not open equipment history.', true);
     return;
   }
   historyEquipment = equipment;
@@ -691,6 +1003,10 @@ for (const card of metricButtons) {
   card.addEventListener('click', () => applyMetric(card.dataset.metric));
 }
 
+for (const button of navButtons) {
+  button.addEventListener('click', () => showView(button.dataset.view));
+}
+
 function applyEquipmentSchedule() {
   const last = form.elements.last_maintenance_date.value;
   const interval = form.elements.pm_interval.value;
@@ -727,22 +1043,608 @@ historyForm.addEventListener('submit', (event) => {
   saveHistory(event).catch(() => showHistoryErrors({ form: 'Could not reach the server.' }));
 });
 
+function openInventoryRow(id) {
+  openHistory(id).catch(() => showBanner('Could not reach the server.', true));
+}
+
 tbody.addEventListener('click', (event) => {
-  const button = event.target.closest('button');
-  if (!button) return;
-  const id = Number(button.dataset.id);
-  if (button.dataset.action === 'edit') openEdit(id);
-  if (button.dataset.action === 'history') {
-    openHistory(id).catch(() => showBanner('Could not reach the server.', true));
-  }
+  const row = event.target.closest('tr[data-id]');
+  if (!row || !tbody.contains(row)) return;
+  openInventoryRow(Number(row.dataset.id));
+});
+
+tbody.addEventListener('keydown', (event) => {
+  if (event.key !== 'Enter' && event.key !== ' ') return;
+  const row = event.target.closest('tr[data-id]');
+  if (!row || event.target !== row) return;
+  event.preventDefault();
+  openInventoryRow(Number(row.dataset.id));
 });
 
 for (const button of document.querySelectorAll('[data-close]')) {
   button.addEventListener('click', () => {
     const target = button.dataset.close;
-    const dialog = target === 'form' ? formDialog : historyDialog;
+    const dialog = target === 'form' ? formDialog : target === 'request' ? requestDialog : historyDialog;
     dialog.close();
   });
 }
 
-Promise.all([loadSummary(), loadEquipment()]).catch(() => showBanner('Could not reach the server.', true));
+function priorityClass(priority) {
+  if (priority === 'High') return 'status-overdue';
+  if (priority === 'Medium') return 'status-due';
+  return 'status-not-scheduled';
+}
+
+function requestStatusClass(status) {
+  return `req-${String(status).toLowerCase().replaceAll(' ', '-')}`;
+}
+
+function requestRowClass(row) {
+  const active = row.status !== 'Completed' && row.status !== 'Cancelled';
+  if (active && row.priority === 'High') return 'row-alert';
+  if (row.status === 'Waiting for Parts') return 'row-warn';
+  if (row.status === 'Cancelled') return 'row-muted';
+  return '';
+}
+
+function showRequestBanner(message, isError) {
+  for (const banner of [requestsBanner, opsRequestsBanner]) {
+    banner.hidden = false;
+    banner.textContent = message;
+    banner.classList.toggle('error', Boolean(isError));
+  }
+}
+
+function clearRequestBanner() {
+  for (const banner of [requestsBanner, opsRequestsBanner]) {
+    banner.hidden = true;
+    banner.textContent = '';
+    banner.classList.remove('error');
+  }
+}
+
+function renderRequestMetrics(rows) {
+  const summary = DashboardFilter.summarizeWork(rows, todayString());
+  const values = {
+    'ops-requests-open': summary.open,
+    'ops-requests-progress': summary.in_progress,
+    'ops-requests-parts': summary.waiting_for_parts,
+    'ops-requests-completed': summary.completed_this_month,
+    'ops-open-work': summary.open_work,
+    'ops-high-priority': summary.high_priority_open_work,
+    'ops-oldest-age': summary.oldest_open_age == null ? '—' : summary.oldest_open_age
+  };
+  for (const [id, value] of Object.entries(values)) {
+    document.querySelector(`#${id}`).textContent = value;
+  }
+  document.querySelector('#ops-requests-parts-card').classList.toggle('has-count', summary.waiting_for_parts > 0);
+  document.querySelector('#ops-high-priority-card').classList.toggle('has-count', summary.high_priority_open_work > 0);
+  document.querySelector('#ops-oldest-age-card').classList.toggle('has-count', (summary.oldest_open_age ?? 0) >= 7);
+  renderDonut(chartRequests, countLabeled(rows, 'status', [
+    { label: 'Open', color: 'var(--chart-open)' },
+    { label: 'In Progress', color: 'var(--ok)' },
+    { label: 'Waiting for Parts', color: 'var(--chart-amber)' },
+    { label: 'Completed', color: 'var(--blue)' },
+    { label: 'Cancelled', color: 'var(--chart-gray)' }
+  ]), { title: 'Service Request Status', centerLabel: 'requests' });
+  renderColumnChart(chartPriority, countLabeled(rows, 'priority', [
+    { label: 'High', color: 'var(--danger)' },
+    { label: 'Medium', color: 'var(--chart-amber)' },
+    { label: 'Low', color: 'var(--chart-open)' }
+  ]), 'Service Request Priority');
+}
+
+function statusOptions(selected) {
+  return REQUEST_STATUSES.map((status) => {
+    const selectedAttr = status === selected ? ' selected' : '';
+    return `<option${selectedAttr}>${escapeHtml(status)}</option>`;
+  }).join('');
+}
+
+function renderRequestTable(rows) {
+  const noun = rows.length === 1 ? 'request' : 'requests';
+  requestCount.textContent = `Showing ${rows.length} ${noun}`;
+  if (!rows.length) {
+    const message = requestStatusFilter.value
+      ? 'No requests match this status.'
+      : 'No service requests yet.';
+    requestsBody.innerHTML = emptyRow(8, message);
+    return;
+  }
+  requestsBody.innerHTML = rows.map((row) => `
+    <tr class="${requestRowClass(row)}">
+      <td class="nowrap">${escapeHtml(row.request_number)}</td>
+      <td>
+        <div class="equip-name">${escapeHtml(row.equipment_name)}</div>
+        <div class="equip-meta"><span class="tag">${escapeHtml(row.asset_tag)}</span></div>
+      </td>
+      <td>${escapeHtml(row.reported_by)}</td>
+      <td><span class="badge ${priorityClass(row.priority)}">${escapeHtml(row.priority)}</span></td>
+      <td class="problem-cell">${escapeHtml(row.problem)}</td>
+      <td>
+        <select class="status-select ${requestStatusClass(row.status)}" data-request-id="${row.id}" aria-label="Status for ${escapeHtml(row.request_number)}">
+          ${statusOptions(row.status)}
+        </select>
+      </td>
+      <td class="nowrap">${showDate(row.opened_on)}</td>
+      <td class="nowrap">${showDate(row.closed_on)}</td>
+    </tr>
+  `).join('');
+}
+
+async function loadRequests() {
+  const response = await fetch('/api/service-requests');
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data.errors?.form || data.errors?.status || 'Could not load service requests.';
+    showRequestBanner(message, true);
+    requestsBody.innerHTML = emptyRow(8, message);
+    requestCount.textContent = '';
+    setChartMessage(chartRequests, message);
+    setChartMessage(chartPriority, message);
+    for (const host of [chartMostRequests, chartRequestDepartment, chartRequestCategory, openWorkAge, attentionList]) {
+      setChartMessage(host, message);
+    }
+    dashboardRequests = null;
+    return;
+  }
+  clearRequestBanner();
+  dashboardRequests = data;
+  if (dashboardEquipment) applyDashboard();
+  else if (!dashboardFiltersActive()) renderRequestMetrics(data);
+  const status = requestStatusFilter.value;
+  if (!status) {
+    renderRequestTable(data);
+    return;
+  }
+  const filteredResponse = await fetch(`/api/service-requests?status=${encodeURIComponent(status)}`);
+  const filtered = await filteredResponse.json().catch(() => ({}));
+  if (!filteredResponse.ok) {
+    const message = filtered.errors?.status || filtered.errors?.form || 'Could not filter service requests.';
+    showRequestBanner(message, true);
+    return;
+  }
+  renderRequestTable(filtered);
+}
+
+function clearRequestErrors() {
+  requestFormError.hidden = true;
+  requestFormError.textContent = '';
+  for (const name of REQUEST_FIELDS) {
+    requestForm.elements[name].removeAttribute('aria-invalid');
+    document.querySelector(`#${name}-error`).textContent = '';
+  }
+}
+
+function showRequestErrors(errors) {
+  clearRequestErrors();
+  const entries = Object.entries(errors || {});
+  if (!entries.length) return;
+  for (const [name, message] of entries) {
+    if (name === 'form' || !requestForm.elements[name]) {
+      requestFormError.hidden = false;
+      requestFormError.textContent = message;
+      continue;
+    }
+    requestForm.elements[name].setAttribute('aria-invalid', 'true');
+    document.querySelector(`#${name}-error`).textContent = message;
+  }
+  const firstInvalid = requestForm.querySelector('[aria-invalid="true"]');
+  if (firstInvalid) firstInvalid.focus();
+}
+
+function validateRequest(data) {
+  const errors = {};
+  if (!data.equipment_id) errors.equipment_id = 'Select a device.';
+  if (!data.reported_by) errors.reported_by = 'Enter who reported the problem.';
+  else if (data.reported_by.length > 100) errors.reported_by = 'Name must be 100 characters or fewer.';
+  if (!REQUEST_PRIORITIES.includes(data.priority)) errors.priority = 'Select a priority: low, medium, or high.';
+  if (!data.problem) errors.problem = 'Problem description is required.';
+  else if (data.problem.length > 1000) errors.problem = 'Problem description must be 1000 characters or fewer.';
+  if (!data.opened_on) errors.opened_on = 'Date opened is required.';
+  else if (!isRealDate(data.opened_on)) errors.opened_on = 'Date opened must be a valid date.';
+  else if (data.opened_on > todayString()) errors.opened_on = 'Date opened cannot be in the future.';
+  return errors;
+}
+
+async function openRequestForm() {
+  clearRequestBanner();
+  const response = await fetch('/api/equipment');
+  const devices = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    showRequestBanner(devices.errors?.form || 'Could not load devices for a new request.', true);
+    return;
+  }
+  const options = ['<option value="">Select a device</option>'];
+  for (const device of devices) {
+    options.push(
+      `<option value="${device.id}">${escapeHtml(device.equipment_name)} (${escapeHtml(device.asset_tag)})</option>`
+    );
+  }
+  requestForm.elements.equipment_id.innerHTML = options.join('');
+  requestForm.reset();
+  requestForm.elements.opened_on.value = todayString();
+  requestForm.elements.opened_on.max = todayString();
+  clearRequestErrors();
+  requestDialog.showModal();
+  requestForm.elements.equipment_id.focus();
+}
+
+async function saveRequest(event) {
+  event.preventDefault();
+  const data = {
+    equipment_id: requestForm.elements.equipment_id.value.trim(),
+    reported_by: requestForm.elements.reported_by.value.trim(),
+    priority: requestForm.elements.priority.value.trim(),
+    problem: requestForm.elements.problem.value.trim(),
+    opened_on: requestForm.elements.opened_on.value.trim()
+  };
+  const errors = validateRequest(data);
+  if (Object.keys(errors).length) {
+    showRequestErrors(errors);
+    return;
+  }
+  const response = await fetch('/api/service-requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    showRequestErrors(payload.errors || { form: 'Could not save the service request.' });
+    return;
+  }
+  requestDialog.close();
+  await loadRequests();
+  showRequestBanner(`${payload.request_number} saved.`, false);
+}
+
+async function updateRequestStatus(select) {
+  const id = select.dataset.requestId;
+  const status = select.value;
+  const response = await fetch(`/api/service-requests/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    await loadRequests();
+    showRequestBanner(payload.errors?.status || payload.errors?.form || 'Could not update the request status.', true);
+    return;
+  }
+  await loadRequests();
+  showRequestBanner(`${payload.request_number} is ${payload.status}.`, false);
+}
+
+document.querySelector('#request-filter-form').addEventListener('submit', (event) => event.preventDefault());
+requestStatusFilter.addEventListener('change', () => {
+  loadRequests().catch(() => showRequestBanner('Could not reach the server.', true));
+});
+document.querySelector('#add-request-button').addEventListener('click', () => {
+  openRequestForm().catch(() => showRequestBanner('Could not reach the server.', true));
+});
+requestForm.addEventListener('submit', (event) => {
+  saveRequest(event).catch(() => showRequestErrors({ form: 'Could not reach the server.' }));
+});
+requestsBody.addEventListener('change', (event) => {
+  const select = event.target.closest('select[data-request-id]');
+  if (!select) return;
+  updateRequestStatus(select).catch(() => showRequestBanner('Could not reach the server.', true));
+});
+
+const REPORT_MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'
+];
+
+function formatGeneratedDate(iso) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  if (!match) return iso || '';
+  const month = REPORT_MONTHS[Number(match[2]) - 1];
+  if (!month) return iso;
+  return `${month} ${Number(match[3])}, ${match[1]}`;
+}
+
+function showReportsBanner(message, isError) {
+  reportsBanner.hidden = false;
+  reportsBanner.textContent = message;
+  reportsBanner.classList.toggle('error', Boolean(isError));
+}
+
+function clearReportsBanner() {
+  reportsBanner.hidden = true;
+  reportsBanner.textContent = '';
+  reportsBanner.classList.remove('error');
+}
+
+function renderReportCenter(reports) {
+  if (!reports.length) {
+    reportCenter.innerHTML = '<div class="empty-state"><p>No reports are available.</p></div>';
+    return;
+  }
+
+  const groups = [];
+  for (const report of reports) {
+    let group = groups.find((item) => item.section === report.section);
+    if (!group) {
+      group = { section: report.section, reports: [] };
+      groups.push(group);
+    }
+    group.reports.push(report);
+  }
+
+  reportCenter.innerHTML = groups.map((group) => {
+    const headingId = `report-section-${group.section.toLowerCase().replaceAll(' ', '-')}`;
+    const cards = group.reports.map((report) => `
+      <article class="report-card">
+        <div>
+          <span class="file-chip">CSV</span>
+          <h4>${escapeHtml(report.name)}</h4>
+          <p>${escapeHtml(report.description)}</p>
+          <p class="report-meta">Generated ${escapeHtml(formatGeneratedDate(report.generated_on))} · ${escapeHtml(report.filename)}</p>
+        </div>
+        <button type="button" class="button primary" data-report-id="${escapeHtml(report.id)}" aria-label="Download ${escapeHtml(report.name)}">Download</button>
+      </article>
+    `).join('');
+    return `
+      <section class="report-group" aria-labelledby="${headingId}">
+        <h3 id="${headingId}" class="dash-section">${escapeHtml(group.section)}</h3>
+        <div class="report-list">${cards}</div>
+      </section>
+    `;
+  }).join('');
+}
+
+async function loadReports() {
+  const response = await fetch('/api/reports');
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = data.errors?.form || 'Could not load reports.';
+    showReportsBanner(message, true);
+    reportCatalog = [];
+    reportCenter.innerHTML = `<div class="empty-state"><p>${escapeHtml(message)}</p></div>`;
+    return;
+  }
+  clearReportsBanner();
+  reportCatalog = data.reports || [];
+  renderReportCenter(reportCatalog);
+}
+
+async function downloadReport(id, button) {
+  const report = reportCatalog.find((item) => item.id === id);
+  if (!report) return;
+  button.disabled = true;
+  try {
+    const response = await fetch(`/api/reports/${encodeURIComponent(id)}`);
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      showReportsBanner(data.errors?.form || 'Could not download the report.', true);
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = report.filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    clearReportsBanner();
+  } finally {
+    button.disabled = false;
+  }
+}
+
+reportCenter.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-report-id]');
+  if (!button) return;
+  downloadReport(button.dataset.reportId, button).catch(() => {
+    showReportsBanner('Could not reach the server.', true);
+  });
+});
+
+const DASHBOARD_FILTER_LABELS = {
+  department: 'Clinical department',
+  category: 'Device category',
+  operational_status: 'Operational status',
+  request_status: 'Service request status'
+};
+
+function dashboardFiltersActive() {
+  return Object.values(dashboardFilters).some(Boolean);
+}
+
+function slicerChoices(key) {
+  if (key === 'department') {
+    const names = new Set((dashboardEquipment || []).map((device) => device.department).filter(Boolean));
+    if (dashboardFilters.department) names.add(dashboardFilters.department);
+    return [...names].sort((left, right) => left.localeCompare(right)).map((name) => ({ value: name, label: name }));
+  }
+  if (key === 'category') return CATEGORIES.map((name) => ({ value: name, label: name }));
+  if (key === 'operational_status') return OPERATIONAL_STATUSES.map((name) => ({ value: name, label: name }));
+  return REQUEST_STATUSES.map((name) => ({ value: name, label: name }));
+}
+
+function slicerButton(key, value, label, selected) {
+  const active = selected ? ' active' : '';
+  return `<button type="button" class="slicer-option${active}" data-slicer="${escapeHtml(key)}" data-value="${escapeHtml(value)}" aria-pressed="${selected ? 'true' : 'false'}">${escapeHtml(label)}</button>`;
+}
+
+function syncSlicer(host, key) {
+  const selected = dashboardFilters[key];
+  const options = [{ value: '', label: 'All' }, ...slicerChoices(key)];
+  const signature = options.map((option) => `${option.value}\t${option.label}`).join('\n');
+  if (host.dataset.signature !== signature) {
+    host.dataset.signature = signature;
+    host.innerHTML = `
+      <span class="slicer-label" id="${host.id}-label">${escapeHtml(host.dataset.label)}</span>
+      <div class="slicer-options" role="group" aria-labelledby="${host.id}-label">
+        ${options.map((option) => slicerButton(key, option.value, option.label, option.value === selected)).join('')}
+      </div>
+    `;
+    return;
+  }
+  for (const button of host.querySelectorAll('.slicer-option')) {
+    const active = button.dataset.value === selected;
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', active ? 'true' : 'false');
+  }
+}
+
+function renderDashboardSlicers() {
+  syncSlicer(document.querySelector('#slicer-department'), 'department');
+  syncSlicer(document.querySelector('#slicer-category'), 'category');
+  syncSlicer(document.querySelector('#slicer-operational'), 'operational_status');
+  syncSlicer(document.querySelector('#slicer-request'), 'request_status');
+}
+
+function renderActiveFilters(equipmentCount, requestCount) {
+  const host = document.querySelector('#dashboard-active-filters');
+  const reset = document.querySelector('#reset-dashboard-filters');
+  const entries = Object.entries(DASHBOARD_FILTER_LABELS).filter(([key]) => dashboardFilters[key]);
+  reset.disabled = entries.length === 0;
+  if (!entries.length) {
+    host.hidden = true;
+    host.innerHTML = '';
+    return;
+  }
+  host.hidden = false;
+  const chips = entries.map(([key, label]) => `
+    <span class="filter-chip">${escapeHtml(label)}: ${escapeHtml(dashboardFilters[key])}
+      <button type="button" data-clear-filter="${escapeHtml(key)}" aria-label="Clear ${escapeHtml(label)} filter">×</button>
+    </span>
+  `).join('');
+  const counts = equipmentCount == null
+    ? ''
+    : `<span class="filter-result">${equipmentCount} ${equipmentCount === 1 ? 'device' : 'devices'} · ${requestCount} ${requestCount === 1 ? 'request' : 'requests'}</span>`;
+  host.innerHTML = chips + counts;
+}
+
+function renderSupportTable(host, headers, rows, emptyMessage) {
+  if (!host) return;
+  if (!rows.length) {
+    setChartMessage(host, emptyMessage);
+    return;
+  }
+  const head = headers.map((header) => `<th scope="col">${escapeHtml(header)}</th>`).join('');
+  const body = rows.map((row) => `<tr>${row.map((cell) => `<td>${cell}</td>`).join('')}</tr>`).join('');
+  host.innerHTML = `<table class="compact-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function renderSupport(equipment, requests, emptyMessage) {
+  const support = DashboardFilter.summarizeSupport(equipment, requests, todayString());
+  document.querySelector('#ops-requests-per-device').textContent = formatRequestsPerDevice(support.requests_per_active);
+  const requestMessage = emptyMessage === 'No devices yet.'
+    ? 'No service requests yet.'
+    : 'No service requests for this selection.';
+  renderHorizontalBars(
+    chartMostRequests,
+    support.most_requests,
+    'var(--chart-amber)',
+    'Service requests',
+    requestMessage
+  );
+  renderHorizontalBars(
+    chartRequestDepartment,
+    support.by_department,
+    'var(--blue)',
+    'Service requests',
+    emptyMessage
+  );
+  renderHorizontalBars(
+    chartRequestCategory,
+    support.by_category,
+    'var(--chart-teal)',
+    'Service requests',
+    emptyMessage
+  );
+  renderSupportTable(
+    openWorkAge,
+    ['Request', 'Equipment', 'Status', 'Priority', 'Age (days)'],
+    support.open_work.map((row) => [
+      escapeHtml(row.request_number),
+      `${escapeHtml(row.equipment_name)} <span class="tag">${escapeHtml(row.asset_tag)}</span>`,
+      `<span class="badge ${statusClass(row.status)}">${escapeHtml(row.status)}</span>`,
+      `<span class="badge ${priorityClass(row.priority)}">${escapeHtml(row.priority)}</span>`,
+      row.age == null ? '—' : `<span class="${Number(row.age) >= 7 ? 'age-warn' : ''}">${escapeHtml(row.age)}</span>`
+    ]),
+    'No open work for this selection.'
+  );
+  renderSupportTable(
+    attentionList,
+    ['Device', 'Department', 'Requests', 'Corrective visits'],
+    support.attention.map((row) => [
+      `${escapeHtml(row.equipment_name)} <span class="tag">${escapeHtml(row.asset_tag)}</span>`,
+      escapeHtml(row.department),
+      escapeHtml(row.requests),
+      escapeHtml(row.corrective)
+    ]),
+    'No equipment has two or more requests or two or more corrective visits.'
+  );
+}
+
+function applyDashboard() {
+  renderDashboardSlicers();
+  if (!dashboardEquipment || !dashboardRequests) {
+    renderActiveFilters(null, null);
+    return;
+  }
+  const filtered = DashboardFilter.filterDashboard(dashboardEquipment, dashboardRequests, dashboardFilters);
+  const summary = DashboardFilter.summarizeEquipment(filtered.equipment);
+  const emptyMessage = dashboardFiltersActive() ? 'No devices match these filters.' : 'No devices yet.';
+  renderOperations(summary, emptyMessage);
+  renderRequestMetrics(filtered.requests);
+  renderSupport(filtered.equipment, filtered.requests, emptyMessage);
+  renderActiveFilters(filtered.equipment.length, filtered.requests.length);
+}
+
+async function loadDashboardEquipment() {
+  const response = await fetch('/api/equipment');
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !Array.isArray(data)) {
+    const message = data.errors?.form || 'Could not load dashboard equipment.';
+    showOperationsBanner(message, true);
+    dashboardEquipment = null;
+    for (const host of [chartOperational, chartPm, chartDepartment, chartCategory, chartMostRequests, chartRequestDepartment, chartRequestCategory, openWorkAge, attentionList]) {
+      setChartMessage(host, message);
+    }
+    return;
+  }
+  dashboardEquipment = data;
+  clearOperationsBanner();
+  applyDashboard();
+}
+
+function resetDashboardFilters() {
+  dashboardFilters.department = '';
+  dashboardFilters.category = '';
+  dashboardFilters.operational_status = '';
+  dashboardFilters.request_status = '';
+  applyDashboard();
+}
+
+document.querySelector('#dashboard-filters').addEventListener('click', (event) => {
+  if (event.target.closest('#reset-dashboard-filters')) {
+    resetDashboardFilters();
+    return;
+  }
+  const clear = event.target.closest('[data-clear-filter]');
+  if (clear) {
+    dashboardFilters[clear.dataset.clearFilter] = '';
+    applyDashboard();
+    return;
+  }
+  const option = event.target.closest('[data-slicer]');
+  if (!option) return;
+  const key = option.dataset.slicer;
+  const value = option.dataset.value;
+  dashboardFilters[key] = !value || dashboardFilters[key] === value ? '' : value;
+  applyDashboard();
+});
+
+renderDashboardSlicers();
+renderActiveFilters(null, null);
+
+Promise.all([loadSummary(), loadEquipment(), loadRequests()]).catch(() => showBanner('Could not reach the server.', true));

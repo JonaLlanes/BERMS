@@ -9,11 +9,11 @@ assert.strictEqual(maintenanceStatus('2026-10-15', today), 'Due');
 assert.strictEqual(maintenanceStatus('2026-10-01', today), 'Due');
 assert.strictEqual(maintenanceStatus('2026-10-31', today), 'Due');
 assert.strictEqual(maintenanceStatus('2026-09-15', today), 'Overdue');
-assert.strictEqual(maintenanceStatus('2026-11-01', today), 'Current');
+assert.strictEqual(maintenanceStatus('2026-11-01', today), 'On Schedule');
 assert.strictEqual(maintenanceStatus(null, today), 'Not Scheduled');
 assert.strictEqual(maintenanceStatus('', today), 'Not Scheduled');
 assert.strictEqual(maintenanceStatus('2026-02-14', '2026-01-15'), 'Due');
-assert.strictEqual(maintenanceStatus('2026-02-15', '2026-01-15'), 'Current');
+assert.strictEqual(maintenanceStatus('2026-02-15', '2026-01-15'), 'On Schedule');
 
 const dates = [null, '', '2026-09-15', '2026-10-01', '2026-10-31', '2026-11-01'];
 for (const nextDate of dates) {
@@ -23,7 +23,7 @@ for (const nextDate of dates) {
   if (status === 'Not Scheduled') assert.strictEqual(condition.sql, 'next_maintenance_date IS NULL');
   if (status === 'Overdue') assert.ok(next < condition.params[0]);
   if (status === 'Due') assert.ok(next >= condition.params[0] && next <= condition.params[1]);
-  if (status === 'Current') assert.ok(next > condition.params[0]);
+  if (status === 'On Schedule') assert.ok(next > condition.params[0]);
 }
 assert.deepStrictEqual(statusCondition('Due', today).params, [today, '2026-10-31']);
 assert.strictEqual(nextPmDate('2026-01-15', 'Monthly'), '2026-02-15');

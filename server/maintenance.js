@@ -1,6 +1,6 @@
 const DUE_SOON_DAYS = 30;
 
-const MAINTENANCE_STATUSES = ['Not Scheduled', 'Overdue', 'Due', 'Current'];
+const MAINTENANCE_STATUSES = ['Not Scheduled', 'Overdue', 'Due', 'On Schedule'];
 
 const PM_INTERVALS = ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual'];
 
@@ -50,7 +50,7 @@ function maintenanceStatus(nextDate, today = todayString()) {
   const next = String(nextDate).slice(0, 10);
   if (next < today) return 'Overdue';
   if (next <= addDays(today, DUE_SOON_DAYS)) return 'Due';
-  return 'Current';
+  return 'On Schedule';
 }
 
 function statusCondition(status, today = todayString()) {
@@ -63,7 +63,7 @@ function statusCondition(status, today = todayString()) {
       params: [today, dueSoonEnd]
     };
   }
-  if (status === 'Current') return { sql: 'next_maintenance_date > ?', params: [dueSoonEnd] };
+  if (status === 'On Schedule') return { sql: 'next_maintenance_date > ?', params: [dueSoonEnd] };
   return null;
 }
 
